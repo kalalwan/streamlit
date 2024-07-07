@@ -1,0 +1,14 @@
+dependencies:
+  - pip
+  - python
+  - pip:
+    - numpy
+    - pandas
+    - streamlit
+    - matplotlib
+    - streamlit-option-menu
+    - deta
+    - ipykernel
+    - jupyter
+
+name: streamlit-env

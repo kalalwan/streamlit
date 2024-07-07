@@ -1,0 +1,10 @@
+{
+    "apiKey": "AIzaSyDMFxeFVWXAFL76cwDg19DJbvSay5CSqdM",
+    "authDomain": "bear-streamlit-app.firebaseapp.com",
+    "databaseURL": "https://bear-streamlit-app-default-rtdb.firebaseio.com",
+    "projectId": "bear-streamlit-app",
+    "storageBucket": "bear-streamlit-app.appspot.com",
+    "messagingSenderId": "428883157574",
+    "appId": "1:428883157574:web:724b1fef222b4920372047",
+    "measurementId": "G-016HGPCTS4"
+}
