@@ -1,0 +1,10 @@
+streamlit
+sqlite3
+pandas
+json
+reportlab.lib.pagesizes
+reportlab.platypus
+reportlab.lib.styles
+reportlab.lib
+io
+re
