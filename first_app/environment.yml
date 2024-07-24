@@ -10,5 +10,6 @@ dependencies:
     - deta
     - ipykernel
     - jupyter
+    - reportlab
 
 name: streamlit-env
