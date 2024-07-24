@@ -1,21 +1,13 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-import hashlib
-from reportlab.lib.pagesizes import A6, letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, PageBreak, Paragraph, Spacer
+import json
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 import io
-import json
-import csv
 import re
-
-def safe_json_loads(json_str):
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError:
-        return []  # Return an empty list if JSON decoding fails
 
 # Initialize SQLite database
 conn = sqlite3.connect('survey_responses.db', check_same_thread=False)
@@ -24,8 +16,6 @@ c = conn.cursor()
 # Create the table if it doesn't exist
 c.execute('''CREATE TABLE IF NOT EXISTS responses
              (id INTEGER PRIMARY KEY AUTOINCREMENT,
-              approved INTEGER DEFAULT 0,
-              title TEXT,
               q1_problem TEXT,
               q2_behavior_change TEXT,
               q3_whose_behavior TEXT,
@@ -44,9 +34,6 @@ def main():
     
     if 'page' not in st.session_state:
         st.session_state.page = 'home'
-    
-    if 'csv_data' not in st.session_state:
-        st.session_state.csv_data = None
 
     show_sidebar()
 
@@ -56,138 +43,6 @@ def main():
         show_problem_survey()
     elif st.session_state.page == 'scientist':
         show_scientist_dashboard()
-    elif st.session_state.page == 'project_manager':
-        show_project_manager_view()
-
-def show_project_manager_view():
-    st.title("Project Manager Dashboard")
-
-    if 'pm_logged_in' not in st.session_state:
-        st.session_state.pm_logged_in = False
-
-    if not st.session_state.pm_logged_in:
-        with st.form("login_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Login")
-
-        if submitted:
-            if username == "bear@rotman.utoronto.ca" and password == "mentalaccounting":
-                st.session_state.pm_logged_in = True
-                st.success("Logged in successfully!")
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
-    
-    if st.session_state.pm_logged_in:
-        show_project_manager_dashboard()
-
-    if st.button("Back to Home", key="pm_view_back"):
-        st.session_state.page = 'home'
-        st.session_state.pm_logged_in = False
-        st.rerun()
-
-def show_project_manager_dashboard():
-    st.subheader("Project Manager Dashboard")
-
-    col1, col2 = st.columns(2)
-
-     # Debug section
-    st.subheader("Debug Information")
-    total_responses = pd.read_sql_query("SELECT COUNT(*) FROM responses", conn).iloc[0, 0]
-    approved_responses = pd.read_sql_query("SELECT COUNT(*) FROM responses WHERE approved = 1", conn).iloc[0, 0]
-    unapproved_responses = pd.read_sql_query("SELECT COUNT(*) FROM responses WHERE approved = 0", conn).iloc[0, 0]
-    
-    st.write(f"Total responses in database: {total_responses}")
-    st.write(f"Approved responses: {approved_responses}")
-    st.write(f"Unapproved responses: {unapproved_responses}")
-
-    with col1:
-        # CSV Upload
-        uploaded_file = st.file_uploader("Choose a CSV file", type="csv", key="csv_uploader")
-        
-        if uploaded_file is not None:
-            if st.button("Process CSV"):
-                df = pd.read_csv(uploaded_file)
-                st.session_state.csv_data = df
-                num_records = process_csv_upload(df)
-                st.success(f"Successfully processed {num_records} records.")
-
-        if st.session_state.csv_data is not None:
-            st.write("Uploaded CSV data:")
-            st.write(st.session_state.csv_data)
-
-    with col2:
-        # Show unapproved responses
-        show_unapproved_responses()
-
-def show_unapproved_responses():
-    st.subheader("Unapproved Responses")
-    
-    # Load unapproved responses
-    df = pd.read_sql_query("SELECT * FROM responses WHERE approved = 0", conn)
-    
-    if df.empty:
-        st.write("No unapproved responses to review.")
-    else:
-        st.write(f"Number of unapproved responses: {len(df)}")
-        
-        # Select a response to review
-        response_id = st.selectbox("Select a response to review:", df['id'].tolist())
-        
-        if response_id:
-            review_response(response_id)
-
-def review_response(response_id):
-    # Fetch the selected response
-    query = f"SELECT * FROM responses WHERE id = {response_id}"
-    df = pd.read_sql_query(query, conn)
-    row = df.iloc[0]
-
-    st.subheader(f"Response {row['id']}")
-    
-    # Display all fields without allowing edits
-    for column in df.columns:
-        if column != 'id' and column != 'approved':
-            st.write(f"{column}: {row[column]}")
-
-    if st.button("Approve", key=f'approve_button_{response_id}'):
-        approve_response(response_id)
-        st.success("Response approved successfully!")
-        st.rerun()
-
-def approve_response(response_id):
-    c.execute("UPDATE responses SET approved = 1 WHERE id = ?", (response_id,))
-    conn.commit()
-    
-    # Verify the update
-    c.execute("SELECT approved FROM responses WHERE id = ?", (response_id,))
-    result = c.fetchone()
-    if result and result[0] == 1:
-        st.success(f"Response {response_id} approved successfully!")
-    else:
-        st.error(f"Failed to approve response {response_id}. Please try again.")
-
-def update_response(response_id, title, q1_problem, q2_behavior_change, q3_whose_behavior, q4_beneficiary,
-                    q5_current_behavior, q6_desired_behavior, q7_frictions, q7_explain,
-                    q8_address_problem, q9_patient_journey, q10_settings):
-    c.execute("""
-        UPDATE responses
-        SET title=?, q1_problem=?, q2_behavior_change=?, q3_whose_behavior=?, q4_beneficiary=?,
-            q5_current_behavior=?, q6_desired_behavior=?, q7_frictions=?, q7_explain=?,
-            q8_address_problem=?, q9_patient_journey=?, q10_settings=?
-        WHERE id=?
-    """, (title, q1_problem, q2_behavior_change, 
-          json.dumps(q3_whose_behavior), 
-          json.dumps(q4_beneficiary),
-          q5_current_behavior, q6_desired_behavior, 
-          json.dumps(q7_frictions), 
-          q7_explain,
-          q8_address_problem, 
-          json.dumps(q9_patient_journey), 
-          json.dumps(q10_settings), 
-          response_id))
-    conn.commit()
 
 def show_home():
     st.title("BEAR's North Star")
@@ -299,47 +154,69 @@ def show_problem_survey():
         st.session_state.page = 'home'
         st.rerun()
 
-def show_sidebar():
-    with st.sidebar:
-        st.title("Navigation")
-        if st.button("Home", key="sidebar_home"):
-            st.session_state.page = 'home'
-            st.rerun()
-        
-        st.markdown("---")
-        st.title("Admin Access")
-        if st.button("Project Manager Login", key="sidebar_pm_login"):
-            st.session_state.page = 'project_manager'
-            st.rerun()
+def safe_json_loads(x):
+    try:
+        return json.loads(x)
+    except json.JSONDecodeError:
+        return []  # Return an empty list if JSON decoding fails
+    except TypeError:
+        return []  # Return an empty list if x is None or not a string
 
 def show_scientist_dashboard():
     st.title("Behavioural Scientist Dashboard")
     
     # Load data
-    df = pd.read_sql_query("SELECT * FROM responses WHERE approved = 1", conn)
+    df = pd.read_sql_query("SELECT * FROM responses", conn)
     
     if df.empty:
-        st.write("No approved responses yet.")
+        st.write("No responses yet.")
         return
     
-    # Display results in a table format
-    st.write("Approved Responses:")
+    # Print current column names for debugging
+    st.write("Current columns:", df.columns.tolist())
     
-    # Create a display dataframe
+    # Convert JSON strings back to lists, handling potential errors
+    json_columns = ['q3_whose_behavior', 'q4_beneficiary', 'q7_frictions', 'q9_patient_journey', 'q10_settings']
+    for col in json_columns:
+        if col in df.columns:
+            df[col] = df[col].apply(safe_json_loads)
+    
+    # Keyword filter
+    keyword = st.text_input("Filter responses by keyword:")
+    if keyword:
+        df = df[df.apply(lambda row: row.astype(str).str.contains(keyword, case=False).any(), axis=1)]
+    
+    # Display results in a table format
+    st.write("Responses:")
+    
+    # Create a display dataframe without the ID column if it exists
     display_df = df.copy()
+    if 'id' in display_df.columns:
+        display_df = display_df.drop(columns=['id'])
     display_df = display_df.reset_index(drop=True)
     display_df.index += 1  # Start index from 1 instead of 0
     
     # Rename columns for better readability
-    new_column_names = ['ID', 'Approved', 'Title', 'Problem', 'Behavior Change', 'Whose Behavior', 'Beneficiary',
-                        'Current Behavior', 'Desired Behavior', 'Frictions', 'Friction Explanation',
-                        'How It Addresses Problem', 'Patient Journey Stage', 'Settings']
+    new_column_names = {
+        'q1_problem': 'Problem',
+        'q2_behavior_change': 'Behavior Change',
+        'q3_whose_behavior': 'Whose Behavior',
+        'q4_beneficiary': 'Beneficiary',
+        'q5_current_behavior': 'Current Behavior',
+        'q6_desired_behavior': 'Desired Behavior',
+        'q7_frictions': 'Frictions',
+        'q7_explain': 'Friction Explanation',
+        'q8_address_problem': 'How It Addresses Problem',
+        'q9_patient_journey': 'Patient Journey Stage',
+        'q10_settings': 'Settings'
+    }
     
-    display_df.columns = new_column_names
+    # Only rename columns that exist in the DataFrame
+    display_df.rename(columns={col: new_name for col, new_name in new_column_names.items() if col in display_df.columns}, inplace=True)
     
     # Display the table
-    st.dataframe(display_df)
-        
+    st.dataframe(display_df, height=400)
+    
     # Input field for response numbers
     response_numbers = st.text_input("Enter response numbers to download (comma-separated, e.g., 1,3,5):")
     
@@ -364,15 +241,16 @@ def show_scientist_dashboard():
         else:
             st.warning("No response numbers entered. Please enter at least one response number.")
     
-    if st.button("Back to Home", key="problem_back_scientist"):
+    if st.button("Back to Home", key="scientist_back"):
         st.session_state.page = 'home'
         st.rerun()
 
-def safe_json_loads(x):
-    try:
-        return json.loads(x)
-    except json.JSONDecodeError:
-        return []  # Return an empty list if JSON decoding fails
+def show_sidebar():
+    with st.sidebar:
+        st.title("Navigation")
+        if st.button("Home", key="sidebar_home"):
+            st.session_state.page = 'home'
+            st.rerun()
 
 def create_index_cards_pdf(df):
     buffer = io.BytesIO()
@@ -451,40 +329,6 @@ def create_index_cards_pdf(df):
     doc.build(elements)
     buffer.seek(0)
     return buffer
-
-def process_csv_upload(df):
-    rows_processed = 0
-    for _, row in df.iterrows():
-        try:
-            c.execute("""
-                INSERT INTO responses (
-                    approved, title, q1_problem, q2_behavior_change, q3_whose_behavior,
-                    q4_beneficiary, q5_current_behavior, q6_desired_behavior,
-                    q7_frictions, q7_explain, q8_address_problem, q9_patient_journey,
-                    q10_settings
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                0,  # approved (set to 0 for unapproved)
-                row.get('title (generated by manual input from admin)', ''),
-                row.get('1 what problem from your healthcare setting do you want to tackle', ''),
-                row.get('2 will a change in behavior address this problem', ''),
-                json.dumps(row.get('3 whose behaviour should primarily be changed', '').split(',') if row.get('3 whose behaviour should primarily be changed') else []),
-                json.dumps(row.get('4 who will the primary beneficiary of this behaviour change be', '').split(',') if row.get('4 who will the primary beneficiary of this behaviour change be') else []),
-                row.get('5 current behaviour what are they currently doing', ''),
-                row.get('6 desired behaviour what should they be doing that might solve the problem', ''),
-                json.dumps(row.get('7 why might they not be doing the desired behavior', '').split(',') if row.get('7 why might they not be doing the desired behavior') else []),
-                row.get('please describe your response', ''),
-                row.get('8 how will the behaviour change address the problem', ''),
-                json.dumps(row.get('9 at which stage of the patient journey map does this problem arise', '').split(',') if row.get('9 at which stage of the patient journey map does this problem arise') else []),
-                json.dumps(row.get('10 does this problem manifest itself in any of the following settings', '').split(',') if row.get('10 does this problem manifest itself in any of the following settings') else [])
-            ))
-            rows_processed += 1
-        except Exception as e:
-            st.error(f"Error processing row: {str(e)}")
-            st.write(row)  # This will show the problematic row
-    
-    conn.commit()
-    return rows_processed
 
 if __name__ == "__main__":
     main()
