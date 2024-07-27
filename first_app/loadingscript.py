@@ -1,12 +1,11 @@
-import csv
 import sqlite3
+import csv
 import json
 
 # Connect to the SQLite database
 conn = sqlite3.connect('survey_responses.db')
 cursor = conn.cursor()
 
-# Function to safely convert string to JSON
 def safe_json_dumps(value):
     if value:
         try:
