@@ -11,5 +11,6 @@ dependencies:
     - ipykernel
     - jupyter
     - reportlab
+    - sqlalchemy
 
 name: streamlit-env

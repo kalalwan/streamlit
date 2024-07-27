@@ -8,3 +8,4 @@ reportlab.lib.styles
 reportlab.lib
 io
 re
+sqlalchemy

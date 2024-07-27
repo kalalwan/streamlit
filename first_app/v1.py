@@ -1,5 +1,4 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import json
 from reportlab.lib.pagesizes import letter
@@ -9,25 +8,25 @@ from reportlab.lib import colors
 import io
 import re
 
-# Initialize SQLite database
-conn = sqlite3.connect('survey_responses.db', check_same_thread=False)
-c = conn.cursor()
+# Create the SQL connection to survey_db as specified in your secrets file.
+conn = st.connection('survey_db', type='sql')
 
 # Create the table if it doesn't exist
-c.execute('''CREATE TABLE IF NOT EXISTS responses
-             (id INTEGER PRIMARY KEY AUTOINCREMENT,
-              q1_problem TEXT,
-              q2_behavior_change TEXT,
-              q3_whose_behavior TEXT,
-              q4_beneficiary TEXT,
-              q5_current_behavior TEXT,
-              q6_desired_behavior TEXT,
-              q7_frictions TEXT,
-              q7_explain TEXT,
-              q8_address_problem TEXT,
-              q9_patient_journey TEXT,
-              q10_settings TEXT)''')
-conn.commit()
+with conn.session as s:
+    s.execute('''CREATE TABLE IF NOT EXISTS responses
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  q1_problem TEXT,
+                  q2_behavior_change TEXT,
+                  q3_whose_behavior TEXT,
+                  q4_beneficiary TEXT,
+                  q5_current_behavior TEXT,
+                  q6_desired_behavior TEXT,
+                  q7_frictions TEXT,
+                  q7_explain TEXT,
+                  q8_address_problem TEXT,
+                  q9_patient_journey TEXT,
+                  q10_settings TEXT)''')
+    s.commit()
 
 def main():
     st.set_page_config(page_title="BEAR's North Star", page_icon="🐻", layout="wide")
@@ -136,18 +135,19 @@ def show_problem_survey():
         submitted = st.form_submit_button("Submit")
         
         if submitted:
-            c.execute("""
-                INSERT INTO responses (
-                    q1_problem, q2_behavior_change, q3_whose_behavior, q4_beneficiary,
-                    q5_current_behavior, q6_desired_behavior, q7_frictions, q7_explain,
-                    q8_address_problem, q9_patient_journey, q10_settings
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                q1, q2, json.dumps(q3), json.dumps(q4),
-                q5, q6, json.dumps(q7), q7_explain,
-                q8, json.dumps(q9), json.dumps(q10)
-            ))
-            conn.commit()
+            with conn.session as s:
+                s.execute("""
+                    INSERT INTO responses (
+                        q1_problem, q2_behavior_change, q3_whose_behavior, q4_beneficiary,
+                        q5_current_behavior, q6_desired_behavior, q7_frictions, q7_explain,
+                        q8_address_problem, q9_patient_journey, q10_settings
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    q1, q2, json.dumps(q3), json.dumps(q4),
+                    q5, q6, json.dumps(q7), q7_explain,
+                    q8, json.dumps(q9), json.dumps(q10)
+                ))
+                s.commit()
             st.success("Survey submitted successfully!")
     
     if st.button("Back to Home", key="problem_back_survey"):
@@ -158,15 +158,15 @@ def safe_json_loads(x):
     try:
         return json.loads(x)
     except json.JSONDecodeError:
-        return []  # Return an empty list if JSON decoding fails
+        return []
     except TypeError:
-        return []  # Return an empty list if x is None or not a string
+        return []
 
 def show_scientist_dashboard():
     st.title("Behavioural Scientist Dashboard")
     
     # Load data
-    df = pd.read_sql_query("SELECT * FROM responses", conn)
+    df = conn.query("SELECT * FROM responses", ttl=0)
     
     if df.empty:
         st.write("No responses yet.")
