@@ -172,9 +172,9 @@ def safe_json_loads(x):
     try:
         return json.loads(x)
     except json.JSONDecodeError:
-        return []  # Return an empty list if JSON decoding fails
+        return x  # Return the original string if it's not valid JSON
     except TypeError:
-        return []  # Return an empty list if x is None or not a string
+        return x  # Return the original value if it's not a string
 
 def show_scientist_dashboard():
     st.title("Behavioural Scientist Dashboard")
@@ -347,9 +347,11 @@ def create_index_cards_pdf(df):
         if row['q1_problem']:
             problem_statements.append(f"<b>{strip_question_number('q1_problem')}:</b> {row['q1_problem']}")
         if row['q9_patient_journey']:
-            problem_statements.append(f"<b>{strip_question_number('q9_patient_journey')}:</b> {', '.join(row['q9_patient_journey'])}")
+            journey = ', '.join(safe_json_loads(row['q9_patient_journey']))
+            problem_statements.append(f"<b>{strip_question_number('q9_patient_journey')}:</b> {journey}")
         if row['q10_settings']:
-            problem_statements.append(f"<b>{strip_question_number('q10_settings')}:</b> {', '.join(row['q10_settings'])}")
+            settings = ', '.join(safe_json_loads(row['q10_settings']))
+            problem_statements.append(f"<b>{strip_question_number('q10_settings')}:</b> {settings}")
         
         if problem_statements:
             elements.append(Paragraph("<b>Problem Statement</b>", styles['SectionTitle']))
@@ -375,7 +377,8 @@ def create_index_cards_pdf(df):
         # Barriers to Change Section
         if row['q7_frictions']:
             elements.append(Paragraph("<b>Barriers to Change</b>", styles['SectionTitle']))
-            elements.append(Paragraph(f"<b>{strip_question_number('q7_frictions')}:</b> {', '.join(row['q7_frictions'])}", styles['Entry']))
+            frictions = ', '.join(safe_json_loads(row['q7_frictions']))
+            elements.append(Paragraph(f"<b>{strip_question_number('q7_frictions')}:</b> {frictions}", styles['Entry']))
             elements.append(Spacer(1, 20))
         
         # The Desired Outcome Section
@@ -383,7 +386,8 @@ def create_index_cards_pdf(df):
         if row['q8_address_problem']:
             desired_outcomes.append(f"<b>{strip_question_number('q8_address_problem')}:</b> {row['q8_address_problem']}")
         if row['q4_beneficiary']:
-            desired_outcomes.append(f"<b>{strip_question_number('q4_beneficiary')}:</b> {', '.join(row['q4_beneficiary'])}")
+            beneficiary = ', '.join(safe_json_loads(row['q4_beneficiary']))
+            desired_outcomes.append(f"<b>{strip_question_number('q4_beneficiary')}:</b> {beneficiary}")
         
         if desired_outcomes:
             elements.append(Paragraph("<b>The Desired Outcome</b>", styles['SectionTitle']))
