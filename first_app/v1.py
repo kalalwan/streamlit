@@ -180,7 +180,10 @@ def show_scientist_dashboard():
     st.title("Behavioural Scientist Dashboard")
     
     # Load data
-    df = pd.read_sql_query("SELECT * FROM responses", conn)
+    df = pd.read_sql_query("SELECT q1_problem, q2_behavior_change, q3_whose_behavior,\
+                           q4_beneficiary, q5_current_behavior, q6_desired_behavior, \
+                           q7_frictions, q7_explain, q8_address_problem, q9_patient_journey\
+                            q10_settings FROM responses", conn)
     
     if df.empty:
         st.write("No responses yet.")
