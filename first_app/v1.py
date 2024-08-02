@@ -29,6 +29,7 @@ c = conn.cursor()
 # Create the table if it doesn't exist
 c.execute('''CREATE TABLE IF NOT EXISTS responses
              (id INTEGER PRIMARY KEY AUTOINCREMENT,
+              title TEXT,
               q1_problem TEXT,
               q2_behavior_change TEXT,
               q3_whose_behavior TEXT,
@@ -193,11 +194,61 @@ def show_scientist_dashboard():
     
     # Keyword filter
     keyword = st.text_input("Filter responses by keyword:")
+    
+    # Multiple choice filters
+    st.subheader("Filter by Multiple Choice Questions")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Filter for q2_behavior_change
+        behavior_change_options = ['All'] + df['q2_behavior_change'].unique().tolist()
+        selected_behavior_change = st.selectbox("Behavior Change", behavior_change_options)
+        
+        # Filter for q3_whose_behavior
+        whose_behavior_options = ['All'] + list(set([item for sublist in df['q3_whose_behavior'] for item in sublist]))
+        selected_whose_behavior = st.multiselect("Whose Behavior", whose_behavior_options)
+        
+        # Filter for q4_beneficiary
+        beneficiary_options = ['All'] + list(set([item for sublist in df['q4_beneficiary'] for item in sublist]))
+        selected_beneficiary = st.multiselect("Beneficiary", beneficiary_options)
+    
+    with col2:
+        # Filter for q7_frictions
+        friction_options = ['All'] + list(set([item for sublist in df['q7_frictions'] for item in sublist]))
+        selected_frictions = st.multiselect("Frictions", friction_options)
+        
+        # Filter for q9_patient_journey
+        journey_options = ['All'] + list(set([item for sublist in df['q9_patient_journey'] for item in sublist]))
+        selected_journey = st.multiselect("Patient Journey Stage", journey_options)
+        
+        # Filter for q10_settings
+        settings_options = ['All'] + list(set([item for sublist in df['q10_settings'] for item in sublist]))
+        selected_settings = st.multiselect("Settings", settings_options)
+    
+    # Apply filters
     if keyword:
         df = df[df.apply(lambda row: row.astype(str).str.contains(keyword, case=False).any(), axis=1)]
     
+    if selected_behavior_change != 'All':
+        df = df[df['q2_behavior_change'] == selected_behavior_change]
+    
+    if selected_whose_behavior and 'All' not in selected_whose_behavior:
+        df = df[df['q3_whose_behavior'].apply(lambda x: any(item in x for item in selected_whose_behavior))]
+    
+    if selected_beneficiary and 'All' not in selected_beneficiary:
+        df = df[df['q4_beneficiary'].apply(lambda x: any(item in x for item in selected_beneficiary))]
+    
+    if selected_frictions and 'All' not in selected_frictions:
+        df = df[df['q7_frictions'].apply(lambda x: any(item in x for item in selected_frictions))]
+    
+    if selected_journey and 'All' not in selected_journey:
+        df = df[df['q9_patient_journey'].apply(lambda x: any(item in x for item in selected_journey))]
+    
+    if selected_settings and 'All' not in selected_settings:
+        df = df[df['q10_settings'].apply(lambda x: any(item in x for item in selected_settings))]
+    
     # Display results in a table format
-    st.write("Responses:")
+    st.subheader("Filtered Responses:")
     
     # Create a display dataframe without the ID column if it exists
     display_df = df.copy()
@@ -281,9 +332,9 @@ def create_index_cards_pdf(df):
     
     for index, row in df.iterrows():
         # Title Section
-        if row['q6_desired_behavior'] and row['q1_problem']:
+        if row['title']:
             elements.append(Paragraph(f"<b>Title</b>", styles['SectionTitle']))
-            elements.append(Paragraph(f"{row['q6_desired_behavior']} to solve {row['q1_problem']}", styles['Entry']))
+            elements.append(Paragraph(f"{row['title']}", styles['Entry']))
             elements.append(Spacer(1, 20))
         
         # Problem Statement Section

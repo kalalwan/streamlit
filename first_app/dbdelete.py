@@ -11,6 +11,7 @@ try:
     # Recreate the responses table
     cursor.execute('''CREATE TABLE responses
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  title TEXT, 
                   q1_problem TEXT,
                   q2_behavior_change TEXT,
                   q3_whose_behavior TEXT,
