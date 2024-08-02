@@ -185,9 +185,6 @@ def show_scientist_dashboard():
         st.write("No responses yet.")
         return
     
-    # Print current column names for debugging
-    st.write("Current columns:", df.columns.tolist())
-    
     # Convert JSON strings back to lists, handling potential errors
     json_columns = ['q3_whose_behavior', 'q4_beneficiary', 'q7_frictions', 'q9_patient_journey', 'q10_settings']
     for col in json_columns:
