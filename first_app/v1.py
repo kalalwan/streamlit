@@ -185,6 +185,8 @@ def show_scientist_dashboard():
                            q7_frictions, q7_explain, q8_address_problem, q9_patient_journey, \
                             q10_settings FROM responses", conn)
     
+    full_df = pd.read_sql_query("SELECT * FROM responses", conn)
+    
     if df.empty:
         st.write("No responses yet.")
         return
@@ -289,7 +291,7 @@ def show_scientist_dashboard():
         if response_numbers:
             try:
                 selected_indices = [int(idx.strip()) for idx in response_numbers.split(',')]
-                selected_df = df.iloc[pd.Index(selected_indices) - 1]  # Adjust for 0-based indexing
+                selected_df = full_df.iloc[pd.Index(selected_indices) - 1]  # Adjust for 0-based indexing
                 if not selected_df.empty:
                     pdf = create_index_cards_pdf(selected_df)
                     st.download_button(
