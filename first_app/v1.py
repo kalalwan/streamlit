@@ -10,6 +10,8 @@ import io
 import re
 import os
 
+st.set_page_config(page_title="BEAR's North Star", page_icon="🐻", layout="wide")
+
 # Custom CSS to set the background to white and buttons to green
 st.markdown("""
     <style>
@@ -59,9 +61,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS responses
               q10_settings TEXT)''')
 conn.commit()
 
-def main():
-    st.set_page_config(page_title="BEAR's North Star", page_icon="🐻", layout="wide")
-    
+def main():    
     if 'page' not in st.session_state:
         st.session_state.page = 'home'
 
