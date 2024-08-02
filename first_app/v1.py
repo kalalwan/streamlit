@@ -8,9 +8,20 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 import io
 import re
+import os
+
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Connect to the SQLite database in the same directory as the script
+db_path = os.path.join(script_dir, 'survey_responses.db')
 
 # Initialize SQLite database
-conn = sqlite3.connect('survey_responses.db', check_same_thread=False)
+@st.cache_resource
+def get_database_connection():
+    return sqlite3.connect(db_path, check_same_thread=False)
+
+conn = get_database_connection()
 c = conn.cursor()
 
 # Create the table if it doesn't exist
