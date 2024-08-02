@@ -10,6 +10,25 @@ import io
 import re
 import os
 
+# Custom CSS to set the background to white and buttons to green
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: white;
+    }
+    .stButton>button {
+        color: white;
+        background-color: #0e8c4a;
+        border-color: #0e8c4a;
+    }
+    .stButton>button:hover {
+        color: white;
+        background-color: #0a6b38;
+        border-color: #0a6b38;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Get the directory of the current script
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -57,15 +76,18 @@ def main():
 
 def show_home():
     st.title("BEAR's North Star")
-    col1, col2 = st.columns(2)
     
-    with col1:
-        if st.button("I have a behavioural problem"):
-            st.session_state.page = 'problem'
-            st.rerun()
+    # Center the buttons
+    col1, col2, col3 = st.columns([1,2,1])
     
     with col2:
-        if st.button("I am a behavioural scientist"):
+        if st.button("I have a behavioural problem", key="problem_button"):
+            st.session_state.page = 'problem'
+            st.rerun()
+        
+        st.write("")  # Add some space between buttons
+        
+        if st.button("I am a behavioural scientist", key="scientist_button"):
             st.session_state.page = 'scientist'
             st.rerun()
 
