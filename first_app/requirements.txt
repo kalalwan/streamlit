@@ -9,3 +9,4 @@ reportlab.lib
 io
 re
 sqlalchemy
+pymysql
