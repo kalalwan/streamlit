@@ -1,9 +1,14 @@
 import sqlite3
 import csv
 import json
+import os
 
-# Connect to the SQLite database
-conn = sqlite3.connect('survey_responses.db')
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Connect to the SQLite database in the same directory as the script
+db_path = os.path.join(script_dir, 'survey_responses.db')
+conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
 def safe_json_dumps(value):
