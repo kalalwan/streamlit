@@ -269,29 +269,35 @@ def show_scientist_dashboard():
     
     if selected_behavior_change != 'All':
         df = df[df['q2_behavior_change'] == selected_behavior_change]
-    
-    def filter_other(column, options, selected):
-        if 'All' in selected:
+
+    def filter_multiselect(column, options, selected):
+        if not selected or 'All' in selected:
             return pd.Series([True] * len(df))
-        elif 'Other' in selected:
-            return df[column].apply(lambda x: any(item not in options[1:-1] for item in x))
-        else:
-            return df[column].apply(lambda x: any(item in selected for item in x))
+        
+        def check_row(row):
+            row_values = set(row)
+            predefined = set(options[1:-1])  # Exclude 'All' and 'Other'
+            if 'Other' in selected:
+                return bool(row_values - predefined) or any(val in selected for val in row_values)
+            else:
+                return any(val in selected for val in row_values)
+        
+        return df[column].apply(check_row)
 
     if selected_whose_behavior:
-        df = df[filter_other('q3_whose_behavior', whose_behavior_options, selected_whose_behavior)]
+        df = df[filter_multiselect('q3_whose_behavior', whose_behavior_options, selected_whose_behavior)]
     
     if selected_beneficiary:
-        df = df[filter_other('q4_beneficiary', beneficiary_options, selected_beneficiary)]
+        df = df[filter_multiselect('q4_beneficiary', beneficiary_options, selected_beneficiary)]
     
     if selected_frictions:
-        df = df[filter_other('q7_frictions', friction_options, selected_frictions)]
+        df = df[filter_multiselect('q7_frictions', friction_options, selected_frictions)]
     
     if selected_journey:
-        df = df[filter_other('q9_patient_journey', journey_options, selected_journey)]
+        df = df[filter_multiselect('q9_patient_journey', journey_options, selected_journey)]
     
     if selected_settings:
-        df = df[filter_other('q10_settings', settings_options, selected_settings)]
+        df = df[filter_multiselect('q10_settings', settings_options, selected_settings)]
     
     # Display results in a table format
     st.subheader("Filtered Responses:")
