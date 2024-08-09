@@ -86,20 +86,18 @@ def show_problem_survey():
                              "Nurse", "Nurse Practitioner", "Patient", "Pharmacist", 
                              "Physician", "Public Health", "Social Worker", "Student", "Other"])
         
+        q3_other = ""
         if "Other" in q3:
-            q3_other = st.text_input("If 'Other' was selected for Q3, please expand on your choice below.")
-            q3.remove("Other")
-            q3.append(q3_other)
+            q3_other = st.text_input("You selected 'Other' for Q3. Please specify:")
         
         q4 = st.multiselect("4. Who will the primary beneficiary of this behaviour change be?",
                             ["Administrative Staff", "Dietician", "Educator", "Media", 
                              "Nurse", "Nurse Practitioner", "Patient", "Pharmacist", 
                              "Physician", "Public Health", "Social Worker", "Student", "Other"])
         
+        q4_other = ""
         if "Other" in q4:
-            q4_other = st.text_input("If 'Other' was selected for Q4, please expand on your choice below.")
-            q4.remove("Other")
-            q4.append(q4_other)
+            q4_other = st.text_input("You selected 'Other' for Q4. Please specify:")
         
         q5 = st.text_area("5. CURRENT BEHAVIOUR: What are they currently doing?")
         
@@ -114,10 +112,9 @@ def show_problem_survey():
                              "Tech/tools constraints: the desired behaviour change is restricted due to underequipped or inaccessible technology/device/tools",
                              "Other"])
         
+        q7_other = ""
         if "Other" in q7:
-            q7_other = st.text_input("If 'Other' was selected for Q7, please expand on your choice below.")
-            q7.remove("Other")
-            q7.append(q7_other)
+            q7_other = st.text_input("You selected 'Other' for Q7. Please specify:")
         
         q7_explain = st.text_area("Please briefly explain your thoughts on Q7.")
         
@@ -130,10 +127,9 @@ def show_problem_survey():
                              "Stage 4: Follow-Up, Ongoing Care",
                              "Other"])
         
+        q9_other = ""
         if "Other" in q9:
-            q9_other = st.text_input("If 'Other' was selected for Q9, please expand on your choice below.")
-            q9.remove("Other")
-            q9.append(q9_other)
+            q9_other = st.text_input("You selected 'Other' for Q9. Please specify:")
         
         q10 = st.multiselect("10. Does this problem manifest itself in any of the following settings?",
                              ["Primary Care",
@@ -142,14 +138,30 @@ def show_problem_survey():
                               "Community Care",
                               "Other"])
         
+        q10_other = ""
         if "Other" in q10:
-            q10_other = st.text_input("If 'Other' was selected for Q10, please expand on your choice below.")
-            q10.remove("Other")
-            q10.append(q10_other)
+            q10_other = st.text_input("You selected 'Other' for Q10. Please specify:")
         
         submitted = st.form_submit_button("Submit")
         
         if submitted:
+            # Process "Other" responses
+            if "Other" in q3:
+                q3.remove("Other")
+                q3.append(q3_other)
+            if "Other" in q4:
+                q4.remove("Other")
+                q4.append(q4_other)
+            if "Other" in q7:
+                q7.remove("Other")
+                q7.append(q7_other)
+            if "Other" in q9:
+                q9.remove("Other")
+                q9.append(q9_other)
+            if "Other" in q10:
+                q10.remove("Other")
+                q10.append(q10_other)
+
             c.execute("""
                 INSERT INTO responses (
                     q1_problem, q2_behavior_change, q3_whose_behavior, q4_beneficiary,
