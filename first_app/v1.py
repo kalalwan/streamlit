@@ -206,28 +206,49 @@ def show_scientist_dashboard():
     
     with col1:
         # Filter for q2_behavior_change
-        behavior_change_options = ['All'] + df['q2_behavior_change'].unique().tolist()
+        behavior_change_options = ['All', 'Yes', 'No']
         selected_behavior_change = st.selectbox("Behavior Change", behavior_change_options)
         
         # Filter for q3_whose_behavior
-        whose_behavior_options = ['All'] + list(set([item for sublist in df['q3_whose_behavior'] for item in sublist]))
+        whose_behavior_options = ['All', 'Administrative Staff', 'Dietician', 'Educator', 'Media', 
+                                  'Nurse', 'Nurse Practitioner', 'Patient', 'Pharmacist', 
+                                  'Physician', 'Public Health', 'Social Worker', 'Student', 'Other']
         selected_whose_behavior = st.multiselect("Whose Behavior", whose_behavior_options)
         
         # Filter for q4_beneficiary
-        beneficiary_options = ['All'] + list(set([item for sublist in df['q4_beneficiary'] for item in sublist]))
+        beneficiary_options = ['All', 'Administrative Staff', 'Dietician', 'Educator', 'Media', 
+                               'Nurse', 'Nurse Practitioner', 'Patient', 'Pharmacist', 
+                               'Physician', 'Public Health', 'Social Worker', 'Student', 'Other']
         selected_beneficiary = st.multiselect("Beneficiary", beneficiary_options)
     
     with col2:
         # Filter for q7_frictions
-        friction_options = ['All'] + list(set([item for sublist in df['q7_frictions'] for item in sublist]))
+        friction_options = ['All', 
+                            "Ambiguity: unclear guidance to users to adopt desired behaviour",
+                            "Low motivation or awareness: don't know, understand or appreciate the values of desired behaviour",
+                            "Systemic corporation: the desired behaviour involves some changes to upstream/downstream practice in the first place",
+                            "Complexity: nuances or variations of implementing interventions in real life",
+                            "Research lagging behind: Researchers and/or healthcare practitioners need further understanding",
+                            "Tech/tools constraints: the desired behaviour change is restricted due to underequipped or inaccessible technology/device/tools",
+                            "Other"]
         selected_frictions = st.multiselect("Frictions", friction_options)
         
         # Filter for q9_patient_journey
-        journey_options = ['All'] + list(set([item for sublist in df['q9_patient_journey'] for item in sublist]))
+        journey_options = ['All', 
+                           "Stage 1: Prevention, Trigger Event",
+                           "Stage 2: Initial Visit, Diagnosis",
+                           "Stage 3: Treatment, Clinical Care",
+                           "Stage 4: Follow-Up, Ongoing Care",
+                           "Other"]
         selected_journey = st.multiselect("Patient Journey Stage", journey_options)
         
         # Filter for q10_settings
-        settings_options = ['All'] + list(set([item for sublist in df['q10_settings'] for item in sublist]))
+        settings_options = ['All', 
+                            "Primary Care",
+                            "Hospital Care",
+                            "Home and Long-Term Care",
+                            "Community Care",
+                            "Other"]
         selected_settings = st.multiselect("Settings", settings_options)
     
     # Apply filters
@@ -284,10 +305,10 @@ def show_scientist_dashboard():
     st.dataframe(display_df, height=400)
     
     # Input field for response numbers
-    response_numbers = st.text_input("Enter response numbers to download (comma-separated, e.g., 1,3,5):")
+    response_numbers = st.text_input("Enter response numbers to download index cards in pdf (comma-separated, e.g., 1,3,5):")
     
     # Download selected responses
-    if st.button("Download Selected Responses"):
+    if st.button("Submit Selected Responses"):
         if response_numbers:
             try:
                 selected_indices = [int(idx.strip()) for idx in response_numbers.split(',')]
