@@ -60,21 +60,26 @@ def show_home():
     st.markdown("<h1 style='text-align: center;'>BEAR's North Star</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center; font-style: italic;'>An opportunity map for behavioural interventions in healthcare.</h3>", unsafe_allow_html=True)
     
-    # Center the buttons
+    # Add some vertical space
+    st.write("")
+    st.write("")
+    
+    # Create three columns, with the buttons in the middle column
     col1, col2, col3 = st.columns([1,2,1])
     
     with col2:
-        st.markdown("<div style='display: flex; justify-content: center; gap: 20px;'>", unsafe_allow_html=True)
+        # Create two columns within the middle column for the buttons
+        button_col1, button_col2 = st.columns(2)
         
-        if st.button("I have a behavioural problem", key="problem_button"):
-            st.session_state.page = 'problem'
-            st.rerun()
+        with button_col1:
+            if st.button("I have a behavioural problem", key="problem_button", use_container_width=True):
+                st.session_state.page = 'problem'
+                st.rerun()
         
-        if st.button("I am a behavioural scientist", key="scientist_button"):
-            st.session_state.page = 'scientist'
-            st.rerun()
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+        with button_col2:
+            if st.button("I am a behavioural scientist", key="scientist_button", use_container_width=True):
+                st.session_state.page = 'scientist'
+                st.rerun()
 
 def show_problem_survey():
     st.title("Have a Behavioural Problem?")
