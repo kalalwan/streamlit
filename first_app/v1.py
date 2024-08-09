@@ -270,20 +270,28 @@ def show_scientist_dashboard():
     if selected_behavior_change != 'All':
         df = df[df['q2_behavior_change'] == selected_behavior_change]
     
-    if selected_whose_behavior and 'All' not in selected_whose_behavior:
-        df = df[df['q3_whose_behavior'].apply(lambda x: any(item in x for item in selected_whose_behavior))]
+    def filter_other(column, options, selected):
+        if 'All' in selected:
+            return pd.Series([True] * len(df))
+        elif 'Other' in selected:
+            return df[column].apply(lambda x: any(item not in options[1:-1] for item in x))
+        else:
+            return df[column].apply(lambda x: any(item in selected for item in x))
+
+    if selected_whose_behavior:
+        df = df[filter_other('q3_whose_behavior', whose_behavior_options, selected_whose_behavior)]
     
-    if selected_beneficiary and 'All' not in selected_beneficiary:
-        df = df[df['q4_beneficiary'].apply(lambda x: any(item in x for item in selected_beneficiary))]
+    if selected_beneficiary:
+        df = df[filter_other('q4_beneficiary', beneficiary_options, selected_beneficiary)]
     
-    if selected_frictions and 'All' not in selected_frictions:
-        df = df[df['q7_frictions'].apply(lambda x: any(item in x for item in selected_frictions))]
+    if selected_frictions:
+        df = df[filter_other('q7_frictions', friction_options, selected_frictions)]
     
-    if selected_journey and 'All' not in selected_journey:
-        df = df[df['q9_patient_journey'].apply(lambda x: any(item in x for item in selected_journey))]
+    if selected_journey:
+        df = df[filter_other('q9_patient_journey', journey_options, selected_journey)]
     
-    if selected_settings and 'All' not in selected_settings:
-        df = df[df['q10_settings'].apply(lambda x: any(item in x for item in selected_settings))]
+    if selected_settings:
+        df = df[filter_other('q10_settings', settings_options, selected_settings)]
     
     # Display results in a table format
     st.subheader("Filtered Responses:")
