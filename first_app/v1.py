@@ -57,20 +57,24 @@ def main():
         show_scientist_dashboard()
 
 def show_home():
-    st.title("BEAR's North Star")    
+    st.markdown("<h1 style='text-align: center;'>BEAR's North Star</h1>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; font-style: italic;'>An opportunity map for behavioural interventions in healthcare.</h3>", unsafe_allow_html=True)
     
     # Center the buttons
-    col1, col2, col3, col4 = st.columns([1,1,1,1])
+    col1, col2, col3 = st.columns([1,2,1])
     
     with col2:
+        st.markdown("<div style='display: flex; justify-content: center; gap: 20px;'>", unsafe_allow_html=True)
+        
         if st.button("I have a behavioural problem", key="problem_button"):
             st.session_state.page = 'problem'
             st.rerun()
         
-    with col3:        
         if st.button("I am a behavioural scientist", key="scientist_button"):
             st.session_state.page = 'scientist'
             st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
 def show_problem_survey():
     st.title("Have a Behavioural Problem?")
