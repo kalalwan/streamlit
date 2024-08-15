@@ -8,7 +8,7 @@ reportlab.lib.styles
 reportlab.lib
 io
 re
+os
 sqlalchemy
 pymysql
 fuzzywuzzy
-python-Levenshtein
