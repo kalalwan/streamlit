@@ -9,7 +9,6 @@ from reportlab.lib import colors
 import io
 import re
 import os
-from rapidfuzz import process
 
 st.set_page_config(page_title="BEAR's North Star", page_icon="🐻", layout="wide")
 
@@ -109,14 +108,22 @@ def edit_submission(submission_id):
 
     edited_row = {}
 
-    def fuzzy_match_defaults(stored_values, options):
+    def simple_match_defaults(stored_values, options):
         default_values = []
         for val in stored_values:
-            best_match = process.extractOne(val, options, score_cutoff=80)
-            if best_match[1] > 80:  # 80% similarity threshold
-                default_values.append(best_match[0])
+            val = val.upper()
+            if val in options:
+                default_values.append(val)
             else:
-                default_values.append("Other")
+                # Check if any option contains this value as a substring
+                matched = False
+                for option in options:
+                    if val in option:
+                        default_values.append(option)
+                        matched = True
+                        break
+                if not matched:
+                    default_values.append("OTHER")
         return default_values
 
     for col in df.columns:
@@ -125,34 +132,34 @@ def edit_submission(submission_id):
         if col == 'q2_behavior_change':
             edited_row[col] = st.radio(col, options=['YES', 'NO'], index=0 if row[col] == 'YES' else 1, key=f"{submission_id}_{col}")
         elif col in ['q3_whose_behavior', 'q4_beneficiary']:
-            options = ['Administrative Staff', 'Dietician', 'Educator', 'Media', 'Nurse', 'Nurse Practitioner', 'Patient', 'Pharmacist', 'Physician', 'Public Health', 'Social Worker', 'Student', 'Other']
-            default_values = fuzzy_match_defaults(row[col], options)
+            options = ['ALL', 'ADMINISTRATIVE STAFF', 'DIETICIAN', 'EDUCATOR', 'MEDIA', 
+                       'NURSE', 'NURSE PRACTITIONER', 'PATIENT', 'PHARMACIST', 
+                       'PHYSICIAN', 'PUBLIC HEALTH', 'SOCIAL WORKER', 'STUDENT', 'OTHER']
+            default_values = simple_match_defaults(row[col], options)
             edited_row[col] = st.multiselect(col, options=options, default=default_values, key=f"{submission_id}_{col}")
         elif col == 'q7_frictions':
-            options = [
-                "Ambiguity: unclear guidance to users to adopt desired behaviour",
-                "Low motivation or awareness: don't know, understand or appreciate the values of desired behaviour",
-                "Systemic corporation: the desired behaviour involves some changes to upstream/downstream practice in the first place",
-                "Complexity: nuances or variations of implementing interventions in real life",
-                "Research lagging behind: Researchers and/or healthcare practitioners need further understanding",
-                "Tech/tools constraints: the desired behaviour change is restricted due to underequipped or inaccessible technology/device/tools",
-                "Other"
-            ]
-            default_values = fuzzy_match_defaults(row[col], options)
+            options = ['ALL', 
+                       "AMBIGUITY: UNCLEAR GUIDANCE TO USERS TO ADOPT DESIRED BEHAVIOUR",
+                       "LOW MOTIVATION OR AWARENESS: DON'T KNOW, UNDERSTAND OR APPRECIATE THE VALUES OF DESIRED BEHAVIOUR",
+                       "SYSTEMIC CORPORATION: THE DESIRED BEHAVIOUR INVOLVES SOME CHANGES TO UPSTREAM/DOWNSTREAM PRACTICE IN THE FIRST PLACE",
+                       "COMPLEXITY: NUANCES OR VARIATIONS OF IMPLEMENTING INTERVENTIONS IN REAL LIFE",
+                       "RESEARCH LAGGING BEHIND: RESEARCHERS AND/OR HEALTHCARE PRACTITIONERS NEED FURTHER UNDERSTANDING",
+                       "TECH/TOOLS CONSTRAINTS: THE DESIRED BEHAVIOUR CHANGE IS RESTRICTED DUE TO UNDEREQUIPPED OR INACCESSIBLE TECHNOLOGY/DEVICE/TOOLS",
+                       "OTHER"]
+            default_values = simple_match_defaults(row[col], options)
             edited_row[col] = st.multiselect(col, options=options, default=default_values, key=f"{submission_id}_{col}")
         elif col == 'q9_patient_journey':
-            options = [
-                "Stage 1: Prevention, Trigger Event",
-                "Stage 2: Initial Visit, Diagnosis",
-                "Stage 3: Treatment, Clinical Care",
-                "Stage 4: Follow-Up, Ongoing Care",
-                "Other"
-            ]
-            default_values = fuzzy_match_defaults(row[col], options)
+            options = ['ALL', 
+                       "STAGE 1: PREVENTION, TRIGGER EVENT",
+                       "STAGE 2: INITIAL VISIT, DIAGNOSIS",
+                       "STAGE 3: TREATMENT, CLINICAL CARE",
+                       "STAGE 4: FOLLOW-UP, ONGOING CARE",
+                       "OTHER"]
+            default_values = simple_match_defaults(row[col], options)
             edited_row[col] = st.multiselect(col, options=options, default=default_values, key=f"{submission_id}_{col}")
         elif col == 'q10_settings':
-            options = ["Primary Care", "Hospital Care", "Home and Long-Term Care", "Community Care", "Other"]
-            default_values = fuzzy_match_defaults(row[col], options)
+            options = ['ALL', "PRIMARY CARE", "HOSPITAL CARE", "HOME AND LONG-TERM CARE", "COMMUNITY CARE", "OTHER"]
+            default_values = simple_match_defaults(row[col], options)
             edited_row[col] = st.multiselect(col, options=options, default=default_values, key=f"{submission_id}_{col}")
         else:
             edited_row[col] = st.text_input(col, value=row[col], key=f"{submission_id}_{col}")
