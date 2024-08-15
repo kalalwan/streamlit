@@ -9,7 +9,7 @@ from reportlab.lib import colors
 import io
 import re
 import os
-from fuzzywuzzy import process
+from rapidfuzz import process
 
 st.set_page_config(page_title="BEAR's North Star", page_icon="🐻", layout="wide")
 
@@ -112,7 +112,7 @@ def edit_submission(submission_id):
     def fuzzy_match_defaults(stored_values, options):
         default_values = []
         for val in stored_values:
-            best_match = process.extractOne(val, options)
+            best_match = process.extractOne(val, options, score_cutoff=80)
             if best_match[1] > 80:  # 80% similarity threshold
                 default_values.append(best_match[0])
             else:
