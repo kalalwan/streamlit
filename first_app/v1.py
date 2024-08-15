@@ -9,6 +9,7 @@ from reportlab.lib import colors
 import io
 import re
 import os
+from fuzzywuzzy import process
 
 st.set_page_config(page_title="BEAR's North Star", page_icon="🐻", layout="wide")
 
@@ -43,9 +44,11 @@ c.execute('''CREATE TABLE IF NOT EXISTS responses
               q10_settings TEXT)''')
 conn.commit()
 
-def main():    
+def main():
     if 'page' not in st.session_state:
         st.session_state.page = 'home'
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
 
     show_sidebar()
 
@@ -55,6 +58,154 @@ def main():
         show_problem_survey()
     elif st.session_state.page == 'scientist':
         show_scientist_dashboard()
+    elif st.session_state.page == 'project_manager':
+        if st.session_state.logged_in:
+            show_project_manager_view()
+        else:
+            show_login()
+
+def show_login():
+    st.sidebar.title("Project Manager Login")
+    email = st.sidebar.text_input("Email")
+    password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if email == "bear@rotman.utoronto.ca" and password == "mentalaccounting":
+            st.session_state.logged_in = True
+            st.rerun()
+        else:
+            st.sidebar.error("Incorrect email or password")
+
+def show_project_manager_view():
+    st.title("Project Manager Dashboard")
+
+    # Load all submissions
+    df = pd.read_sql_query("SELECT id, title, q1_problem FROM responses", conn)
+
+    # Create a selection box for choosing which submission to edit
+    selected_id = st.selectbox("Select a submission to edit:", 
+                               options=df['id'].tolist(),
+                               format_func=lambda x: f"ID {x}: {df[df['id']==x]['title'].values[0][:50]}...")
+
+    if selected_id:
+        edit_submission(selected_id)
+
+    # Add new submission button
+    if st.button("Add New Submission", key="add_new_submission"):
+        new_id = add_new_submission()
+        st.success(f"New submission added successfully! ID: {new_id}")
+        st.rerun()
+
+def edit_submission(submission_id):
+    query = f"SELECT * FROM responses WHERE id = {submission_id}"
+    df = pd.read_sql_query(query, conn)
+    row = df.iloc[0]
+
+    st.subheader(f"Editing Submission {submission_id}")
+
+    json_columns = ['q3_whose_behavior', 'q4_beneficiary', 'q7_frictions', 'q9_patient_journey', 'q10_settings']
+    for col in json_columns:
+        if col in df.columns:
+            row[col] = safe_json_loads(row[col])
+
+    edited_row = {}
+
+    def fuzzy_match_defaults(stored_values, options):
+        default_values = []
+        for val in stored_values:
+            best_match = process.extractOne(val, options)
+            if best_match[1] > 80:  # 80% similarity threshold
+                default_values.append(best_match[0])
+            else:
+                default_values.append("Other")
+        return default_values
+
+    for col in df.columns:
+        if col == 'id':
+            continue
+        if col == 'q2_behavior_change':
+            edited_row[col] = st.radio(col, options=['YES', 'NO'], index=0 if row[col] == 'YES' else 1, key=f"{submission_id}_{col}")
+        elif col in ['q3_whose_behavior', 'q4_beneficiary']:
+            options = ['Administrative Staff', 'Dietician', 'Educator', 'Media', 'Nurse', 'Nurse Practitioner', 'Patient', 'Pharmacist', 'Physician', 'Public Health', 'Social Worker', 'Student', 'Other']
+            default_values = fuzzy_match_defaults(row[col], options)
+            edited_row[col] = st.multiselect(col, options=options, default=default_values, key=f"{submission_id}_{col}")
+        elif col == 'q7_frictions':
+            options = [
+                "Ambiguity: unclear guidance to users to adopt desired behaviour",
+                "Low motivation or awareness: don't know, understand or appreciate the values of desired behaviour",
+                "Systemic corporation: the desired behaviour involves some changes to upstream/downstream practice in the first place",
+                "Complexity: nuances or variations of implementing interventions in real life",
+                "Research lagging behind: Researchers and/or healthcare practitioners need further understanding",
+                "Tech/tools constraints: the desired behaviour change is restricted due to underequipped or inaccessible technology/device/tools",
+                "Other"
+            ]
+            default_values = fuzzy_match_defaults(row[col], options)
+            edited_row[col] = st.multiselect(col, options=options, default=default_values, key=f"{submission_id}_{col}")
+        elif col == 'q9_patient_journey':
+            options = [
+                "Stage 1: Prevention, Trigger Event",
+                "Stage 2: Initial Visit, Diagnosis",
+                "Stage 3: Treatment, Clinical Care",
+                "Stage 4: Follow-Up, Ongoing Care",
+                "Other"
+            ]
+            default_values = fuzzy_match_defaults(row[col], options)
+            edited_row[col] = st.multiselect(col, options=options, default=default_values, key=f"{submission_id}_{col}")
+        elif col == 'q10_settings':
+            options = ["Primary Care", "Hospital Care", "Home and Long-Term Care", "Community Care", "Other"]
+            default_values = fuzzy_match_defaults(row[col], options)
+            edited_row[col] = st.multiselect(col, options=options, default=default_values, key=f"{submission_id}_{col}")
+        else:
+            edited_row[col] = st.text_input(col, value=row[col], key=f"{submission_id}_{col}")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button(f"Update Submission", key=f"update_{submission_id}"):
+            update_submission(submission_id, edited_row)
+            st.success(f"Submission {submission_id} updated successfully!")
+
+    with col2:
+        if st.button(f"Delete Submission", key=f"delete_{submission_id}"):
+            delete_submission(submission_id)
+            st.warning(f"Submission {submission_id} deleted successfully!")
+            st.rerun()
+
+    with col3:
+        if st.button("Back to Submission List", key="back_to_list"):
+            st.rerun()
+
+def update_submission(submission_id, data):
+    query = """UPDATE responses SET
+               title = ?, q1_problem = ?, q2_behavior_change = ?,
+               q3_whose_behavior = ?, q4_beneficiary = ?, q5_current_behavior = ?,
+               q6_desired_behavior = ?, q7_frictions = ?, q7_explain = ?,
+               q8_address_problem = ?, q9_patient_journey = ?, q10_settings = ?
+               WHERE id = ?"""
+    c.execute(query, (data['title'], data['q1_problem'], data['q2_behavior_change'],
+                      json.dumps(data['q3_whose_behavior']), json.dumps(data['q4_beneficiary']),
+                      data['q5_current_behavior'], data['q6_desired_behavior'],
+                      json.dumps(data['q7_frictions']), data['q7_explain'],
+                      data['q8_address_problem'], json.dumps(data['q9_patient_journey']),
+                      json.dumps(data['q10_settings']), submission_id))
+    conn.commit()
+
+def delete_submission(submission_id):
+    c.execute("DELETE FROM responses WHERE id = ?", (submission_id,))
+    conn.commit()
+
+def add_new_submission():
+    # Get the current maximum ID
+    c.execute("SELECT MAX(id) FROM responses")
+    max_id = c.fetchone()[0]
+    new_id = max_id + 1 if max_id is not None else 1
+
+    # Insert new submission with the new ID
+    c.execute("""INSERT INTO responses (id, title, q1_problem, q2_behavior_change, q3_whose_behavior,
+                 q4_beneficiary, q5_current_behavior, q6_desired_behavior, q7_frictions,
+                 q7_explain, q8_address_problem, q9_patient_journey, q10_settings)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+              (new_id, 'New Submission', '', 'YES', '[]', '[]', '', '', '[]', '', '', '[]', '[]'))
+    conn.commit()
+    return new_id
 
 def show_home():
     st.markdown("<h1 style='text-align: center;'>BEAR's North Star</h1>", unsafe_allow_html=True)
@@ -85,34 +236,28 @@ def show_problem_survey():
     st.title("Have a Behavioural Problem?")
     
     with st.form("survey_form"):
-        q1 = st.text_area("1. What problem from your healthcare setting do you want to tackle? (required)")
+        q1 = st.text_area("Q1. What problem from your healthcare setting do you want to tackle? (required)")
         
-        q2 = st.radio("2. Will a change in behavior address this problem? (required)", 
+        q2 = st.radio("Q2. Will a change in behavior address this problem? (required)", 
                       ["Yes", "No"])
         
-        q3 = st.multiselect("3. Whose behaviour should primarily be changed?", 
+        q3 = st.multiselect("Q3. Whose behaviour should primarily be changed?", 
                             ["Administrative Staff", "Dietician", "Educator", "Media", 
                              "Nurse", "Nurse Practitioner", "Patient", "Pharmacist", 
                              "Physician", "Public Health", "Social Worker", "Student", "Other"])
+        q3_elaborate = st.text_area("Elaborate on your answer to question 3:", key="q3_elaborate")
         
-        q3_other = ""
-        if "Other" in q3:
-            q3_other = st.text_input("You selected 'Other' for Q3. Please specify:")
-        
-        q4 = st.multiselect("4. Who will the primary beneficiary of this behaviour change be?",
+        q4 = st.multiselect("Q4. Who will the primary beneficiary of this behaviour change be?",
                             ["Administrative Staff", "Dietician", "Educator", "Media", 
                              "Nurse", "Nurse Practitioner", "Patient", "Pharmacist", 
                              "Physician", "Public Health", "Social Worker", "Student", "Other"])
+        q4_elaborate = st.text_area("Elaborate on your answer to question 4:", key="q4_elaborate")
         
-        q4_other = ""
-        if "Other" in q4:
-            q4_other = st.text_input("You selected 'Other' for Q4. Please specify:")
+        q5 = st.text_area("Q5. CURRENT BEHAVIOUR: What are they currently doing?")
         
-        q5 = st.text_area("5. CURRENT BEHAVIOUR: What are they currently doing?")
+        q6 = st.text_area("Q6. DESIRED BEHAVIOUR: What should they be doing that might solve the problem?")
         
-        q6 = st.text_area("6. DESIRED BEHAVIOUR: What should they be doing that might solve the problem?")
-        
-        q7 = st.multiselect("7. Why might they not be doing the desired behavior? What might the frictions be?",
+        q7 = st.multiselect("Q7. Why might they not be doing the desired behavior? What might the frictions be?",
                             ["Ambiguity: unclear guidance to users to adopt desired behaviour",
                              "Low motivation or awareness: don't know, understand or appreciate the values of desired behaviour",
                              "Systemic corporation: the desired behaviour involves some changes to upstream/downstream practice in the first place",
@@ -120,57 +265,29 @@ def show_problem_survey():
                              "Research lagging behind: Researchers and/or healthcare practitioners need further understanding",
                              "Tech/tools constraints: the desired behaviour change is restricted due to underequipped or inaccessible technology/device/tools",
                              "Other"])
+        q7_elaborate = st.text_area("Elaborate on your answer to question 7:", key="q7_elaborate")
         
-        q7_other = ""
-        if "Other" in q7:
-            q7_other = st.text_input("You selected 'Other' for Q7. Please specify:")
+        q8 = st.text_area("Q8. How will the behaviour change address the problem?")
         
-        q7_explain = st.text_area("Please briefly explain your thoughts on Q7.")
-        
-        q8 = st.text_area("8. How will the behaviour change address the problem?")
-        
-        q9 = st.multiselect("9. At which stage of the patient journey map does this problem arise?",
+        q9 = st.multiselect("Q9. At which stage of the patient journey map does this problem arise?",
                             ["Stage 1: Prevention, Trigger Event",
                              "Stage 2: Initial Visit, Diagnosis",
                              "Stage 3: Treatment, Clinical Care",
                              "Stage 4: Follow-Up, Ongoing Care",
                              "Other"])
+        q9_elaborate = st.text_area("Elaborate on your answer to question 9:", key="q9_elaborate")
         
-        q9_other = ""
-        if "Other" in q9:
-            q9_other = st.text_input("You selected 'Other' for Q9. Please specify:")
-        
-        q10 = st.multiselect("10. Does this problem manifest itself in any of the following settings?",
+        q10 = st.multiselect("Q10. Does this problem manifest itself in any of the following settings?",
                              ["Primary Care",
                               "Hospital Care",
                               "Home and Long-Term Care",
                               "Community Care",
                               "Other"])
-        
-        q10_other = ""
-        if "Other" in q10:
-            q10_other = st.text_input("You selected 'Other' for Q10. Please specify:")
+        q10_elaborate = st.text_area("Elaborate on your answer to question 10:", key="q10_elaborate")
         
         submitted = st.form_submit_button("Submit")
         
         if submitted:
-            # Process "Other" responses
-            if "Other" in q3:
-                q3.remove("Other")
-                q3.append(q3_other)
-            if "Other" in q4:
-                q4.remove("Other")
-                q4.append(q4_other)
-            if "Other" in q7:
-                q7.remove("Other")
-                q7.append(q7_other)
-            if "Other" in q9:
-                q9.remove("Other")
-                q9.append(q9_other)
-            if "Other" in q10:
-                q10.remove("Other")
-                q10.append(q10_other)
-
             c.execute("""
                 INSERT INTO responses (
                     q1_problem, q2_behavior_change, q3_whose_behavior, q4_beneficiary,
@@ -178,14 +295,22 @@ def show_problem_survey():
                     q8_address_problem, q9_patient_journey, q10_settings
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                q1, q2, json.dumps(q3), json.dumps(q4),
-                q5, q6, json.dumps(q7), q7_explain,
-                q8, json.dumps(q9), json.dumps(q10)
+                q1.upper(),
+                q2.upper(),
+                json.dumps([x.upper() for x in q3] + [f"Elaboration: {q3_elaborate.upper()}"]),
+                json.dumps([x.upper() for x in q4] + [f"Elaboration: {q4_elaborate.upper()}"]),
+                q5.upper(),
+                q6.upper(),
+                json.dumps([x.upper() for x in q7] + [f"Elaboration: {q7_elaborate.upper()}"]),
+                q7_elaborate.upper(),  # This is the existing q7_explain field
+                q8.upper(),
+                json.dumps([x.upper() for x in q9] + [f"Elaboration: {q9_elaborate.upper()}"]),
+                json.dumps([x.upper() for x in q10] + [f"Elaboration: {q10_elaborate.upper()}"])
             ))
             conn.commit()
             st.success("Survey submitted successfully!")
-    
-    if st.button("Back to Home", key="problem_back_survey"):
+
+    if st.button("Back to Home", key="problem_back_survey_button"):
         st.session_state.page = 'home'
         st.rerun()
 
@@ -201,12 +326,7 @@ def show_scientist_dashboard():
     st.title("Behavioural Scientist Dashboard")
     
     # Load data
-    df = pd.read_sql_query("SELECT q1_problem, q2_behavior_change, q3_whose_behavior,\
-                           q4_beneficiary, q5_current_behavior, q6_desired_behavior, \
-                           q7_frictions, q7_explain, q8_address_problem, q9_patient_journey, \
-                            q10_settings FROM responses", conn)
-    
-    full_df = pd.read_sql_query("SELECT * FROM responses", conn)
+    df = pd.read_sql_query("SELECT * FROM responses", conn)
     
     if df.empty:
         st.write("No responses yet.")
@@ -218,8 +338,15 @@ def show_scientist_dashboard():
         if col in df.columns:
             df[col] = df[col].apply(safe_json_loads)
     
+    # Normalize responses by converting to uppercase
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = df[col].apply(lambda x: [item.upper() if isinstance(item, str) else item for item in x] if isinstance(x, list) else x.upper() if isinstance(x, str) else x)
+    
     # Keyword filter
     keyword = st.text_input("Filter responses by keyword:")
+    if keyword:
+        keyword = keyword.upper()
     
     # Multiple choice filters
     st.subheader("Filter by Multiple Choice Questions")
@@ -227,86 +354,91 @@ def show_scientist_dashboard():
     
     with col1:
         # Filter for q2_behavior_change
-        behavior_change_options = ['All', 'Yes', 'No']
+        behavior_change_options = ['ALL', 'YES', 'NO']
         selected_behavior_change = st.selectbox("Behavior Change", behavior_change_options)
         
         # Filter for q3_whose_behavior
-        whose_behavior_options = ['All', 'Administrative Staff', 'Dietician', 'Educator', 'Media', 
-                                  'Nurse', 'Nurse Practitioner', 'Patient', 'Pharmacist', 
-                                  'Physician', 'Public Health', 'Social Worker', 'Student', 'Other']
+        whose_behavior_options = ['ALL', 'ADMINISTRATIVE STAFF', 'DIETICIAN', 'EDUCATOR', 'MEDIA', 
+                                  'NURSE', 'NURSE PRACTITIONER', 'PATIENT', 'PHARMACIST', 
+                                  'PHYSICIAN', 'PUBLIC HEALTH', 'SOCIAL WORKER', 'STUDENT', 'OTHER']
         selected_whose_behavior = st.multiselect("Whose Behavior", whose_behavior_options)
         
         # Filter for q4_beneficiary
-        beneficiary_options = ['All', 'Administrative Staff', 'Dietician', 'Educator', 'Media', 
-                               'Nurse', 'Nurse Practitioner', 'Patient', 'Pharmacist', 
-                               'Physician', 'Public Health', 'Social Worker', 'Student', 'Other']
+        beneficiary_options = ['ALL', 'ADMINISTRATIVE STAFF', 'DIETICIAN', 'EDUCATOR', 'MEDIA', 
+                               'NURSE', 'NURSE PRACTITIONER', 'PATIENT', 'PHARMACIST', 
+                               'PHYSICIAN', 'PUBLIC HEALTH', 'SOCIAL WORKER', 'STUDENT', 'OTHER']
         selected_beneficiary = st.multiselect("Beneficiary", beneficiary_options)
     
     with col2:
         # Filter for q7_frictions
-        friction_options = ['All', 
-                            "Ambiguity: unclear guidance to users to adopt desired behaviour",
-                            "Low motivation or awareness: don't know, understand or appreciate the values of desired behaviour",
-                            "Systemic corporation: the desired behaviour involves some changes to upstream/downstream practice in the first place",
-                            "Complexity: nuances or variations of implementing interventions in real life",
-                            "Research lagging behind: Researchers and/or healthcare practitioners need further understanding",
-                            "Tech/tools constraints: the desired behaviour change is restricted due to underequipped or inaccessible technology/device/tools",
-                            "Other"]
+        friction_options = ['ALL', 
+                            "AMBIGUITY: UNCLEAR GUIDANCE TO USERS TO ADOPT DESIRED BEHAVIOUR",
+                            "LOW MOTIVATION OR AWARENESS: DON'T KNOW, UNDERSTAND OR APPRECIATE THE VALUES OF DESIRED BEHAVIOUR",
+                            "SYSTEMIC CORPORATION: THE DESIRED BEHAVIOUR INVOLVES SOME CHANGES TO UPSTREAM/DOWNSTREAM PRACTICE IN THE FIRST PLACE",
+                            "COMPLEXITY: NUANCES OR VARIATIONS OF IMPLEMENTING INTERVENTIONS IN REAL LIFE",
+                            "RESEARCH LAGGING BEHIND: RESEARCHERS AND/OR HEALTHCARE PRACTITIONERS NEED FURTHER UNDERSTANDING",
+                            "TECH/TOOLS CONSTRAINTS: THE DESIRED BEHAVIOUR CHANGE IS RESTRICTED DUE TO UNDEREQUIPPED OR INACCESSIBLE TECHNOLOGY/DEVICE/TOOLS",
+                            "OTHER"]
         selected_frictions = st.multiselect("Frictions", friction_options)
         
         # Filter for q9_patient_journey
-        journey_options = ['All', 
-                           "Stage 1: Prevention, Trigger Event",
-                           "Stage 2: Initial Visit, Diagnosis",
-                           "Stage 3: Treatment, Clinical Care",
-                           "Stage 4: Follow-Up, Ongoing Care",
-                           "Other"]
+        journey_options = ['ALL', 
+                           "STAGE 1: PREVENTION, TRIGGER EVENT",
+                           "STAGE 2: INITIAL VISIT, DIAGNOSIS",
+                           "STAGE 3: TREATMENT, CLINICAL CARE",
+                           "STAGE 4: FOLLOW-UP, ONGOING CARE",
+                           "OTHER"]
         selected_journey = st.multiselect("Patient Journey Stage", journey_options)
         
         # Filter for q10_settings
-        settings_options = ['All', 
-                            "Primary Care",
-                            "Hospital Care",
-                            "Home and Long-Term Care",
-                            "Community Care",
-                            "Other"]
+        settings_options = ['ALL', 
+                            "PRIMARY CARE",
+                            "HOSPITAL CARE",
+                            "HOME AND LONG-TERM CARE",
+                            "COMMUNITY CARE",
+                            "OTHER"]
         selected_settings = st.multiselect("Settings", settings_options)
     
     # Apply filters
     if keyword:
         df = df[df.apply(lambda row: row.astype(str).str.contains(keyword, case=False).any(), axis=1)]
     
-    if selected_behavior_change != 'All':
+    if selected_behavior_change and selected_behavior_change != 'ALL':
         df = df[df['q2_behavior_change'] == selected_behavior_change]
 
-    def filter_multiselect(column, options, selected):
-        if not selected or 'All' in selected:
+    def filter_multiselect(column, selected, options):
+        if not selected or 'ALL' in selected:
             return pd.Series([True] * len(df))
         
+        predefined_options = set(options[1:-1])  # Exclude 'ALL' and 'OTHER'
+        
         def check_row(row):
-            row_values = set(row)
-            predefined = set(options[1:-1])  # Exclude 'All' and 'Other'
-            if 'Other' in selected:
-                return bool(row_values - predefined) or any(val in selected for val in row_values)
-            else:
-                return any(val in selected for val in row_values)
+            if isinstance(row, list):
+                if 'OTHER' in selected:
+                    return any(item not in predefined_options for item in row)
+                return any(item in selected for item in row)
+            elif isinstance(row, str):
+                if 'OTHER' in selected:
+                    return row not in predefined_options
+                return row in selected
+            return False
         
         return df[column].apply(check_row)
 
     if selected_whose_behavior:
-        df = df[filter_multiselect('q3_whose_behavior', whose_behavior_options, selected_whose_behavior)]
+        df = df[filter_multiselect('q3_whose_behavior', selected_whose_behavior, whose_behavior_options)]
     
     if selected_beneficiary:
-        df = df[filter_multiselect('q4_beneficiary', beneficiary_options, selected_beneficiary)]
+        df = df[filter_multiselect('q4_beneficiary', selected_beneficiary, beneficiary_options)]
     
     if selected_frictions:
-        df = df[filter_multiselect('q7_frictions', friction_options, selected_frictions)]
+        df = df[filter_multiselect('q7_frictions', selected_frictions, friction_options)]
     
     if selected_journey:
-        df = df[filter_multiselect('q9_patient_journey', journey_options, selected_journey)]
+        df = df[filter_multiselect('q9_patient_journey', selected_journey, journey_options)]
     
     if selected_settings:
-        df = df[filter_multiselect('q10_settings', settings_options, selected_settings)]
+        df = df[filter_multiselect('q10_settings', selected_settings, settings_options)]
     
     # Display results in a table format
     st.subheader("Filtered Responses:")
@@ -347,7 +479,7 @@ def show_scientist_dashboard():
         if response_numbers:
             try:
                 selected_indices = [int(idx.strip()) for idx in response_numbers.split(',')]
-                selected_df = full_df.iloc[pd.Index(selected_indices) - 1]  # Adjust for 0-based indexing
+                selected_df = df.iloc[pd.Index(selected_indices) - 1]  # Adjust for 0-based indexing
                 if not selected_df.empty:
                     pdf = create_index_cards_pdf(selected_df)
                     st.download_button(
@@ -373,6 +505,19 @@ def show_sidebar():
         if st.button("Home", key="sidebar_home"):
             st.session_state.page = 'home'
             st.rerun()
+        
+        st.markdown("---")
+        st.title("Admin Access")
+        if not st.session_state.logged_in:
+            show_login()
+        else:
+            if st.button("Project Manager Dashboard"):
+                st.session_state.page = 'project_manager'
+                st.rerun()
+            if st.button("Logout"):
+                st.session_state.logged_in = False
+                st.session_state.page = 'home'
+                st.rerun()
 
 def create_index_cards_pdf(df):
     buffer = io.BytesIO()

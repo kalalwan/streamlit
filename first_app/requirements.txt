@@ -10,3 +10,5 @@ io
 re
 sqlalchemy
 pymysql
+fuzzywuzzy
+python-Levenshtein
