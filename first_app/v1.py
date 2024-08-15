@@ -80,10 +80,21 @@ def show_project_manager_view():
     # Load all submissions
     df = pd.read_sql_query("SELECT id, title, q1_problem FROM responses", conn)
 
+    # Function to safely get the title or use a fallback
+    def get_title(row):
+        if pd.notna(row['title']) and row['title']:
+            return row['title'][:50]
+        elif pd.notna(row['q1_problem']) and row['q1_problem']:
+            return row['q1_problem'][:50]
+        else:
+            return "No title or problem description available"
+
     # Create a selection box for choosing which submission to edit
-    selected_id = st.selectbox("Select a submission to edit:", 
-                               options=df['id'].tolist(),
-                               format_func=lambda x: f"ID {x}: {df[df['id']==x]['title'].values[0][:50]}...")
+    selected_id = st.selectbox(
+        "Select a submission to edit:", 
+        options=df['id'].tolist(),
+        format_func=lambda x: f"ID {x}: {get_title(df[df['id']==x].iloc[0])}..."
+    )
 
     if selected_id:
         edit_submission(selected_id)
